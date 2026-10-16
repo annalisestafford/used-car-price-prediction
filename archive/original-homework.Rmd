@@ -1,0 +1,391 @@
+---
+title: "VehiclesModels"
+output: html_document
+date: "2026-10-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(car)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+vehiclesSE <- read_csv("/Users/acstafford/Downloads/vehiclesSE.csv")
+vehiclesSEclean <- vehiclesSE %>% filter(model == "silverado 1500",year < 2020 & year >= 2010 & price != 0 & is.na(price) == FALSE)
+glimpse(vehiclesSEclean)
+odometerModel <- lm(price~odometer,data= vehiclesSEclean)
+summary(odometerModel)
+vehiclesSEclean
+# The slope of the regression is -.08939, meaning that for every additional mile recorded on the odometer of a vehicle, the estimated price decreases by $0.08939. The negative slope makes sense because a greater odometer value indicates there is more wear on the car, lowering its value.
+```
+
+```{r}
+plot(vehiclesSEclean$odometer, vehiclesSEclean$price, xlab="Odometer", ylab="Price", main="Price vs. Odometer")
+abline(odometerModel,col='red')
+```
+
+
+```{r}
+plot(odometerModel$fitted.values, odometerModel$residuals)
+abline(h=0, col='red')
+# Variance of errors appears to increase as values increase, which is not atypical.
+hist(odometerModel$residuals)
+# Residuals do not resemble a standard normal distribution. Most of the data is present in the middle values, but is left skewed.
+qqnorm(odometerModel$residuals)
+qqline(odometerModel$residuals)
+# Heavy-tailed Q-Q Plot, indicating a greater number of extreme values than typically present in a standard normal distribution.
+```
+
+
+```{r}
+sort(odometerModelData$residuals, decreasing=TRUE)[1:5]
+rstudent(odometerModel)[c(377,392,88,443,408)]
+rstandard(odometerModel)[c(377,392,88,443,408)]
+#the value at 377 should be considered an outlier because both the standardized and studentized residuals are about 6 which fits the criteria for being a BIG outlier (> +-3), which would be considered influential in the data. The others are < +-2, so they are not outliers.
+```
+
+
+```{r}
+#HW2Q5
+hatvalues(odometerModel)[c(377,392,88,443,408)]
+hatvalues(odometerModel)[c(377,392,88,443,408)] > 2/460 * 2
+
+# None of the residuals are greater than 2 * 2/numrows, so none of them have what would be considered high leverage(twice the typical leverage of 2/n).
+```
+
+
+```{r}
+#HW2Q6
+cooks.distance(odometerModel)[c(377,392,88,443,408)]
+cooks.distance(odometerModel)[c(377,392,88,443,408)] > .5
+# None of the cook's distance are greater than .5 which is considered a moderately high cook's value, so none of the points are very influential.
+```
+```{r}
+#HW2Q7
+?confint
+confint(odometerModel)
+# this means that with 95% confidence another mile on the odometer will decrease the price of the silverado 1500 car by -0.105314 to -7.347492e-02.
+```
+
+
+
+```{r}
+#HW2Q9
+new_vehicle <- data.frame(odometer = 60000) # no existing entry with 60000 miles, so create dataframe with one
+?predict
+predict(odometerModel, newdata = new.vehicle, interval = "confidence")
+# This confidence interval represents a range of values from 28404.25 to 30380.01, which is likely to contain the true mean vehicle price with 95% confidence based on the odometer reading.
+predict(odometerModel, newdata = new.vehicle, interval = "prediction")
+# This prediction interval between 12640.09 and 46144.18 means that this range is likely to contain the true value of the response variable (price) for any new single observation based on the odometer reading.
+```
+
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+#HW2Q13
+vehiclesCA<-read.csv("/Users/acstafford/Downloads/vehiclesCA.csv")
+vehiclesCAClean = vehiclesCA %>% filter(is.na(price)==FALSE, price != 0, model=="silverado 1500",year < 2020 & year >= 2010)
+vehiclesCAClean
+
+```
+
+
+```{r}
+#HW2Q14
+odometerModelCA <- lm(price~odometer,data= vehiclesCAClean)
+summary(odometerModelCA)
+plot(vehiclesCAClean$odometer, vehiclesCAClean$price)
+abline(odometerModelCA)
+```
+
+
+
+```{r}
+#HW2Q15
+#SE model to compare plots
+summary(odometerModel)
+plot(vehiclesSEclean$odometer, vehiclesSEclean$price, xlab="Odometer", ylab="Price")
+abline(odometerModel,col='red')
+# The two models have a very similar slope, both exhibiting the same negative relationship between price and odometer in the -8e-2 range. However, the CA model has an intercept of roughly 29000, while the SE model has one of 34000. So, in the SE, the price starts higher and decreases slightly more for each extra mile on the odometer.
+```
+
+
+
+```{r}
+#HW2Q8 Test the strength of the linear relationship between your variables using each of the three methods (test for
+#correlation, test for slope, ANOVA for regression). Include hypotheses for each test and your conclusions in
+#the context of the problem.
+
+# 1. Test for correlation
+cor.test(vehiclesSEclean$odometer, vehiclesSEclean$price)
+# the p-value <.05, so there is significant reason to reject the null hypothesis that odometer and price are uncorrelated, so there is significant evidence of a negative relationship between price and odometer. The fact that the confidence interval does not include 0 is also reason to suspect we will reject the null hypothesis.
+
+# 2. Test for slope
+summary(odometerModel)
+# the test for slope has a p-value of <.05 and a t-value of -11.04, so there is significant reason to reject the null hypothesis. The relationship suggests that for every additional mile on the odometer, the price of the car will decrease by $.089. The R^2 value of.21 means that 21% of the variation can be explained from the model itself.
+
+# 3. ANOVA for regression
+anova(odometerModel)
+# F-statistic of 121.77 p-value significantly less than .05 is reason to reject the null hypothesis that and the predictor and response are unrelated.
+
+#HW2Q10
+plot(vehiclesSEclean$odometer,vehiclesSEclean$price^2)
+cor.test(vehiclesSEclean$odometer, vehiclesSEclean$price^2)
+# Squaring the response seems to be most effective, as it increasing r from -.45 to -.47, although it does not make a large difference in the trend, it only bunches the data together more. In conclusion, it slightly improves the correlation, but not enough to make the transformation worth it.
+
+#HW2Q11
+# No, there is not, as my transformed model still has a positive y intercept. The "free vehicle phenomenon" would apply that the model is only applicable within a certain range of values. It should not, for instance, be used to make assumptions where the odometer is at a negative reading either, as you cannot add value to car by driving negative miles. This would be extrapolation.
+
+#HW2Q12
+todometerModel = lm(price^2~odometer, data=vehiclesSEclean)
+new_vehicle2 <- data.frame(odometer = 60000) # no existing entry with 60000 miles, so create dataframe with one
+predict(odometerModel, newdata = new_vehicle2, interval = "confidence")
+# This confidence interval represents a range of values from 28404.25 to 30380.01, which is likely to contain the true mean vehicle price squared with 95% confidence based on the odometer reading.
+predict(odometerModel, newdata = new_vehicle2, interval = "prediction")
+# This prediction interval between 12640.09 and 46144.18 means that this range is likely to contain the true value of the response variable squared (price^2) for any new single observation based on the odometer reading.
+
+
+
+#HW2Q16
+vehiclesSEclean <- vehiclesSEclean %>% mutate(age = 2026-year)
+vehiclesSEclean
+ageModelSE <- lm(price~age, data=vehiclesSEclean)
+plot(vehiclesSEclean$age, vehiclesSEclean$price)
+abline(ageModelSE, col='red')
+
+
+#HW2Q6cont
+# 1. Test for correlation
+cor.test(vehiclesSEclean$age, vehiclesSEclean$price)
+
+
+# 2. Test for slope
+summary(ageModelSE)
+
+# 3. ANOVA for regression
+anova(ageModelSE)
+
+# A transformation is not necessary, all 3 tests already possess a p-value significantly <.05, which suggests that there is significant reason to believe that the age of the car is negatively correlated with the price, meaning that when age of the car incresases, price of the car decreases. The age based model does appear to be any better as they both possess an r-value of about -.45, but running a multiple regression that factors in both predictors may lead to a better model.
+```
+
+
+```{r}
+#HW4Q1
+MyVehicles = vehiclesSE %>% filter(model == "silverado",year < 2020 & year >= 2010 & price != 0 & is.na(price) == FALSE)
+MyVehicles$age <- 2021 - MyVehicles$year
+
+#HW4Q2
+ageOdomModel = lm(formula = price ~ age + odometer, data = MyVehicles)
+summary(ageOdomModel)
+#HW4Q3
+# H0 : βage = 0; Ha : βage̸ = 0
+# H0 : βodometer = 0; Ha : βodometer̸ = 0
+# In the summary for my model, the p-values for both the age and odometer predictors are well below 0.01 (and below .05), hence I conclude they are both useful in the model.
+```
+
+
+```{r}
+#HW4Q4
+anova455(ageOdomModel)
+# H0 : βage = βodometer = 0
+# Ha : at least one of βage, βodometer != 0
+# Either a citation directly from the summary or use of anova455() works here. For my model, the p-value is small (2.2e-16), so I have enough evidence to reject the null hypothesis and conclude that at least one of the coefficients is nonzero.
+```
+
+```{r}
+#HW4Q5 
+vif(ageOdomModel)
+# The VIF is fairly small (less than 5), so there is little concern about multicollinearity for the model.
+```
+
+```{r}
+#HW4Q6
+new_vehicle <- data.frame(odometer = 60000, age = 2021-2016) # no existing entry with 60000 miles, so create dataframe with one
+predict(ageOdomModel, newdata = new_vehicle, interval = "confidence")
+# Interpretation of confidence interval: With 95% confidence, I predict that the mean price of all 2016 Silverados with 60K miles sold in the Southeast is between $31672.9 and $35942.4
+predict(ageOdomModel, newdata = new_vehicle, interval = "prediction")
+# Interpretation of prediction interval: With 95% confidence I predict that the price of a 2016 Silverado 1500s with 60K miles sold in the Southeast is between $13932.96 and $53682.33.
+```
+```{r}
+#HW4Q7
+ageOdomCatModel = lm(formula = price ~ year + odometer + state, data = MyVehicles)
+```
+
+
+```{r}
+#HW4Q8
+# H0 : βi = 0 for all i ∈ {3, 4, 5, 6, 7, 8}
+# Ha : βi̸ = 0 for some i ∈ {3, 4, 5, 6, 7, 8}
+anova(ageOdomCatModel)
+# In the hypothesis test for my model, we fail to reject the null. There is not statistically significant evidence (p=0.3178) to suggest that any of the state coefficients are nonzero.
+
+```
+```{r}
+#HW4Q9
+interaction = lm(formula = price ~ year + odometer + state + year * state + odometer * state, data = MyVehicles)
+summary(interaction)
+```
+
+
+```{r}
+#HW4Q10
+# H0 : βi = 0 for all i ∈ {3, 4, 5, ..., 20}
+# Ha : βi̸ = 0 for some i ∈ {3, 4, 5, ..., 20}
+anova(ageOdomModel,interaction)
+# This test results in failing to reject the null. There is not statistically significant evidence (p=0.4225) to suggest that at least one of the coefficients for a term with state in the linear model is nonzero.
+```
+```{r}
+#HW4Q11
+quadModel = lm(price ~ age + I(age^2), data = MyVehicles)
+plot(MyVehicles$age, MyVehicles$price)
+plot(quadModel$fitted.values, quadModel$residuals)
+abline(h=0, col='red')
+qqnorm(resid(quadModel))
+qqline(resid(quadModel))
+#For my data linearity seems to be near met by the red curve in the residuals by fitted plot being near the horizontal line at 0. There is some slight curvature that could possibly be addressed. Normality and constant variance of residuals appears to be met, although there are some values on the end of the QQ plot that vear off from the
+```
+```{r}
+#HW4Q12 FIX THIS ONEeeeeeeeeee
+# H0 : βi = 0 for all i
+# Ha : βi̸ = 0 for at least one 
+quadModel2 = lm(price ~ poly(age, 2), data = MyVehicles)
+
+summary(quadModel2)
+
+anova(lm(price ~ 1, data = MyVehicles),
+      lm(price ~ poly(age, 2, raw = TRUE), data = MyVehicles))
+```
+```{r}
+#HW4Q13
+newval <- data.frame(age = 2021-2016) # no existing entry with 60000 miles, so create dataframe with one
+predict(quadModel2, newdata = newval, interval = "prediction")
+# With 95% confidence I predict that a 5 year old silverado will be priced between 11661.85 and 51812.59 dollars.
+```
+
+```{r}
+#HW4Q14
+plot(MyVehicles$age, MyVehicles$price,
+     xlab = "Age",
+     ylab = "Price",
+     main = "Quadratic Model")
+
+curve(predict(model, newdata = data.frame(age = x)),
+      add = TRUE, col = "red", lwd = 2)
+```
+
+```{r}
+#HW4Q15
+model2 <- lm(price ~ age + I(age^2), data = MyVehicles)
+
+# Cubic model
+model3 <- lm(price ~ age + I(age^2) + I(age^3),
+             data = MyVehicles)
+
+# Quartic model
+model4 <- lm(price ~ age + I(age^2) + I(age^3) + I(age^4),
+             data = MyVehicles)
+anova(model2, model3)
+anova(model2, model4)
+# Running a series of nested F-tests we, comparing them to the polynomial model, we can see that both model3 (with the cubic term), and model 4 (with the quartic term) did not produce statistically significant results (p val = 0.5244 and 0.6813 respectively.)
+```
+
+```{r}
+#HW4Q16
+newmodcomplete=lm(price~age+odometer+I(odometer^2)+I(age^2)+I(age*odometer),data = MyVehicles)
+summary(newmodcomplete)
+plot(newmodcomplete)
+# There are a few data points that stray away from QQ line on the end, but the plot largely indicates normality. The errors appear to have constant variance from the Residuals vs Fitted plot. Errors have mean zero. However, the standardized residuals appear have a small constant linear trend at larger values.
+```
+
+```{r}
+#HW4Q17
+# H0 : βi = 0 for all i
+# Ha : βi̸ = 0 for at least one i
+summary(newmodcomplete)
+# The beta vals for age and odometer are statistically significant for the model, but >.05 for both the squared terms and the interaction term, meaning they should not be included in the model.
+anova(newmodcomplete)
+```
+
+```{r}
+#HW4Q18
+# H0 : βi = 0 for all i ∈ {3, 4, 5}
+# Ha : βi̸ = 0 for some i ∈ {3, 4, 5}
+anova(ageOdomModel, newmodcomplete)
+#We fail to reject the null because p-val of .282 > .05)
+```
+
+```{r}
+#HW4Q19
+# H0 : βi = 0 for all i ∈ {2, 4, 5}
+# Ha : βi̸ = 0 for somei ∈ {2, 4, 5}
+nonOdom =lm(price~age+ I(age^2), data = MyVehicles)
+odomTerms = lm(price~age+ odometer+ I(age^2)+ I(odometer^2)+ I(age*odometer), data = MyVehicles)
+anova(nonOdom, odomTerms)
+
+# We reject the null hypothesis with a p-value of .03288 < .05. There is statistically significant evidence (p = .03288) to suggest that at least one of the coefficients for a term with odometer in the model is nonzero.
+```
+
+```{r}
+#HW4Q20
+NumRows = nrow(MyVehicles)
+rows = sample(NumRows)
+MyVehiclesShuffled = MyVehicles[rows, ]
+
+MyVehiclesTraining = MyVehiclesShuffled[1:70, ]
+MyVehiclesTest = MyVehiclesShuffled[71:100, ]
+
+testmodel <- lm(price ~ age + I(age^2), data = MyVehiclesTraining)
+summary(testmodel)
+
+MyVehicles_fitvals_Parsimonious <- predict(testmodel, newdata = MyVehiclesTest)
+
+vholdout_resids_Parsimonious <- MyVehiclesTest$price - MyVehicles_fitvals_Parsimonious
+
+mean(vholdout_resids_Parsimonious)
+sd(vholdout_resids_Parsimonious)
+
+vcorr_Parsimonious <- cor(MyVehiclesTest$price, MyVehicles_fitvals_Parsimonious)
+vcorr_Parsimonious^2
+
+vShrinkage_Parsimonious <- summary(testmodel)$r.squared - vcorr_Parsimonious^2
+vShrinkage_Parsimonious
+
+#The mean of the holdout residuals was 202.36, and the standard deviation was 9231.74. The correlation between the actual and predicted prices was 0.5928, giving a holdout R^2 of 0.3515. The training R^2 was 0.4126, so the shrinkage was 0.0611. The holdout R^2 was lower than the training R^2, meaning the model performed slightly worse on new data than on the data it was trained on. However, the difference was fairly small, so there is not strong evidence of overfitting.
+
+```
+
+```{r}
+#HW4Q21
+
+standardized_residuals <- rstandard(quadModel)
+i <- which.max(abs(standardized_residuals))
+
+MyVehicles[i, c("price", "year", "age")]
+
+predicted_price <- predict(model)[i]
+predicted_price 
+
+residual <- residuals(quadModel)[i]
+standardized_residuals[i]
+
+cooks.distance(quadModel)[i]
+# The standardized residual was approximately 7.47. Since its absolute value is greater than 3, it is considered an extreme outlier. However, the cook’s distance was 0.1590, which is less than 1, so the datapoint is not highly influential. To determine whether it is moderately influential, compare cook’s distance with the threshold 4/n (2x avg of 2/n).
+```
+

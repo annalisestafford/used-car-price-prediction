@@ -1,0 +1,121 @@
+---
+title: "What Drives Used Chevrolet Silverado Prices?"
+author: "Data Science Portfolio Project"
+subtitle: Regression modeling and diagnostic analysis of Southeast U.S. vehicle listings
+output:
+  pdf_document:
+    toc: true
+  html_document:
+    toc: true
+    toc_float: true
+    theme: flatly
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo=TRUE, warning=FALSE, message=FALSE, fig.width=8, fig.height=5)
+library(dplyr)
+library(ggplot2)
+library(readr)
+library(broom)
+vehicles <- read_csv("data/silverado_1500_clean.csv", show_col_types=FALSE)
+set.seed(42)
+```
+
+## Executive summary
+
+This analysis examines how **vehicle age** and **mileage** relate to advertised prices of 2010–2019 Chevrolet Silverado 1500 listings in the Southeast. The goal is to explain relationships, compare model complexity, and estimate out-of-sample predictive accuracy. Prices are *asking prices*, not verified transaction prices; associations are not causal.
+
+## Dataset
+
+The provided source CSV is a used-vehicle listings extract. The reproducible portfolio dataset retains Silverado 1500 listings with model years 2010–2019, positive prices, and nonmissing nonnegative mileage. Age is measured relative to **2021**, matching the original coursework's reference year. The dataset includes `r nrow(vehicles)` listings from `r n_distinct(vehicles$state)` states. The analysis below uses this consistent subset for every model; the original homework sometimes used a different model label (`silverado`) and therefore different samples.
+
+```{r preview}
+glimpse(vehicles)
+summary(vehicles[c("price", "age", "odometer")])
+```
+
+## Exploratory data analysis
+
+```{r plots, fig.show='hold'}
+ggplot(vehicles, aes(odometer, price)) + geom_point(alpha=.4, color="#2563eb") + geom_smooth(method="lm", se=TRUE, color="#ea580c") + labs(title="Price versus mileage", x="Mileage (miles)", y="Asking price ($)") + theme_minimal()
+ggplot(vehicles, aes(age, price)) + geom_jitter(width=.12, alpha=.4, color="#2563eb") + geom_smooth(method="lm", se=TRUE, color="#ea580c") + labs(title="Price versus age", x="Age in 2021 (years)", y="Asking price ($)") + theme_minimal()
+```
+
+## Baseline and nonlinear regression
+
+```{r models}
+mileage <- lm(price ~ odometer, data=vehicles)
+age <- lm(price ~ age, data=vehicles)
+additive <- lm(price ~ age + odometer, data=vehicles)
+quadratic <- lm(price ~ age + I(age^2), data=vehicles)
+second_order <- lm(price ~ age + odometer + I(age^2) + I(odometer^2) + age:odometer, data=vehicles)
+model_list <- list("Mileage only"=mileage, "Age only"=age, "Age + mileage"=additive, "Quadratic age"=quadratic, "Complete second order"=second_order)
+comparison <- bind_rows(lapply(names(model_list), function(nm) {
+ s <- glance(model_list[[nm]])
+ data.frame(model=nm, r_squared=s$r.squared, adjusted_r_squared=s$adj.r.squared, AIC=s$AIC)
+}))
+knitr::kable(comparison, digits=3)
+summary(additive)
+```
+
+A model with a higher R-squared is not automatically preferable: additional terms can overfit. Use the adjusted R-squared, nested tests for genuinely nested models, and holdout error to assess whether complexity helps.
+
+```{r tests}
+anova(mileage, additive)
+anova(additive, second_order)
+anova(quadratic, second_order)
+```
+
+## Residual diagnostics
+
+```{r diagnostics, fig.show='hold'}
+par(mfrow=c(1,2))
+plot(additive, which=1)
+plot(additive, which=2)
+par(mfrow=c(1,1))
+diagnostics <- data.frame(standardized_residual=rstandard(additive), leverage=hatvalues(additive), cooks_distance=cooks.distance(additive))
+head(diagnostics[order(-diagnostics$cooks_distance),], 5)
+```
+
+Residual patterns may indicate nonconstant variance, nonnormal errors, or outliers. The table identifies observations worth inspecting rather than automatically deleting them.
+
+## Prediction intervals
+
+```{r intervals}
+new_listing <- data.frame(age=5, odometer=60000)
+predict(additive, newdata=new_listing, interval="confidence", level=.95)
+predict(additive, newdata=new_listing, interval="prediction", level=.95)
+```
+
+The confidence interval estimates the **mean** listing price at the specified age and mileage; the prediction interval describes a **single** new listing and is wider.
+
+## Holdout validation
+
+```{r validation}
+set.seed(42)
+train_idx <- sample(seq_len(nrow(vehicles)), size=floor(.8*nrow(vehicles)))
+train <- vehicles[train_idx,]
+test <- vehicles[-train_idx,]
+formulas <- list("Mileage only"=price~odometer, "Age only"=price~age, "Age + mileage"=price~age+odometer, "Quadratic age"=price~age+I(age^2), "Complete second order"=price~age+odometer+I(age^2)+I(odometer^2)+age:odometer)
+metrics <- bind_rows(lapply(names(formulas), function(nm) {
+ fit <- lm(formulas[[nm]], data=train)
+ predicted <- predict(fit, newdata=test)
+ actual <- test$price
+ data.frame(model=nm, MAE=mean(abs(actual-predicted)), RMSE=sqrt(mean((actual-predicted)^2)), test_R2=1-sum((actual-predicted)^2)/sum((actual-mean(actual))^2))
+}))
+knitr::kable(metrics, digits=2)
+```
+
+The holdout split is random, not chronological. Results measure performance on a comparable sample of listings, not future market conditions.
+
+## Limitations and next steps
+
+- Listings are not completed sales; listing quality and market conditions are unobserved.
+- Age and mileage may be correlated; inspect coefficient stability and collinearity.
+- Selection of a single model and year range limits generalizability.
+- Improve the study by incorporating trim, condition, location, and listing date; validate on a later time period.
+
+## Reproducibility
+
+Run `source("requirements.R")` once, then `rmarkdown::render("analysis.Rmd")` from the project directory. Data and plots are included in this repository.

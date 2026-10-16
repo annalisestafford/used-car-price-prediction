@@ -1,0 +1,6 @@
+Model,R-squared,Adjusted R-squared,AIC
+Mileage only,0.21,0.208,9653.4
+Age only,0.212,0.211,9651.8
+Age + mileage,0.277,0.273,9614.6
+Quadratic age,0.229,0.226,9643.8
+Complete second order,0.31,0.302,9599.0
