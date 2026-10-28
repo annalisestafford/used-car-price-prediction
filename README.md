@@ -67,6 +67,3 @@ This project demonstrates how to translate a raw listing dataset into a defensib
 
 Prices are advertisements, not transactions. This is observational data, and associations should not be interpreted as causal effects. The 2021 age reference follows the original analysis. A future iteration could include vehicle condition, trim, regional market effects, and time-aware validation.
 
-## Provenance
-
-Refactored from a course R Markdown analysis. The original submission is retained in `archive/`; all displayed summary metrics here were recomputed from the provided CSV using the consistently filtered Silverado 1500 sample. The R report itself has **not** been executed in this environment because R is not installed.
